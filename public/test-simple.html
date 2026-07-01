@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Socket Simple</title>
+</head>
+<body>
+    <h1>Test Socket Simple</h1>
+    <div id="status">Desconectado</div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        // Obtén el token del localStorage o donde lo tengas guardado
+        const token = localStorage.getItem('token');
+        
+        const socket = io('http://localhost:3000', {
+            transports: ['websocket'],
+            auth: {
+                token: token
+            }
+        });
+
+        socket.on('connect', () => {
+            console.log('¡Conectado!');
+            document.getElementById('status').textContent = 'Conectado';
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Desconectado');
+            document.getElementById('status').textContent = 'Desconectado';
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('Error de conexión:', error);
+            document.getElementById('status').textContent = 'Error: ' + error.message;
+        });
+    </script>
+</body>
+</html>

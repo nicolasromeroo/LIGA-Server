@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "Match" ALTER COLUMN "teamA" SET DATA TYPE TEXT,
+ALTER COLUMN "teamB" SET DATA TYPE TEXT;
+
+-- AlterTable
+ALTER TABLE "PlayerCard" ADD COLUMN     "mazoId" INTEGER;
+
+-- AddForeignKey
+ALTER TABLE "PlayerCard" ADD CONSTRAINT "PlayerCard_mazoId_fkey" FOREIGN KEY ("mazoId") REFERENCES "Mazo"("id") ON DELETE SET NULL ON UPDATE CASCADE;

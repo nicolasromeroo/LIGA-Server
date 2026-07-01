@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test WebSocket</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Test WebSocket</h1>
+    <div id="status">Desconectado</div>
+
+    <script>
+        const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjMsImVtYWlsIjoibmljb2xhaTNAZ21haWwuY29tIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzYxNzExNTIzLCJleHAiOjE3NjE3OTc5MjN9.paWWuASnfv8kvd1gQU36SwFffsAH0DmtdU1Lz3b263c';
+        
+        const socket = io('http://localhost:3000', {
+            transports: ['websocket'],
+            auth: {
+                token: token
+            },
+            extraHeaders: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor');
+            document.getElementById('status').textContent = 'Conectado';
+            console.log('ID de Socket:', socket.id);
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Desconectado del servidor');
+            document.getElementById('status').textContent = 'Desconectado';
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('Error de conexión:', error);
+            document.getElementById('status').textContent = 'Error de conexión: ' + error.message;
+        });
+
+        socket.on('error', (error) => {
+            console.error('Error de Socket:', error);
+            document.getElementById('status').textContent = 'Error: ' + error;
+        });
+    </script>
+</body>
+</html>

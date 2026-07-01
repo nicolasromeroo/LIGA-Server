@@ -1,0 +1,32 @@
+# Dependencias
+/node_modules
+/dist
+/build
+
+# Archivos de entorno
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Base de datos
+/prisma/dev.db
+/prisma/dev.db-journal
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

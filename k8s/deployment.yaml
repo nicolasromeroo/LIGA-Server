@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: footsport-api
+  labels:
+    app: footsport-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: footsport-api
+  template:
+    metadata:
+      labels:
+        app: footsport-api
+    spec:
+      containers:
+      - name: footsport-api
+        image: footsport-api:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: footsport-secrets
+              key: database-url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: footsport-secrets
+              key: jwt-secret
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
