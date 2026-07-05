@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 import { SportdbModule } from './sportdb/sportdb.module';
+import { MundialModule } from './mundial/mundial.module';
 // import { PlayersModule } from './players/players.module';
 import { PacksModule } from './packs/packs.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -27,6 +28,7 @@ import { ProdeModule } from './prode/prode.module';
     ScheduleModule.forRoot(),
     RedisModule,
     SportdbModule,
+    MundialModule,
     PrismaModule,
     AuthModule,
     // PlayersModule,

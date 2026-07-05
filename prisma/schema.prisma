@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,20 +8,22 @@ datasource db {
 }
 
 model User {
-  id           Int           @id @default(autoincrement())
-  email        String        @unique
-  password     String
-  name         String
-  role         String        @default("USER")
-  points       Int           @default(0)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  packs        Pack[]
-  playerCards  PlayerCard[]
-  roomPlayers  RoomPlayer[]
-  mazos        Mazo[] // Relación con los mazos del usuario
-  matchResults MatchResult[]
-  predictions  Prediction[] // Pronósticos de prode del usuario
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  password      String
+  name          String
+  role          String         @default("USER")
+  points        Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  matchResults  MatchResult[]
+  mazos         Mazo[]
+  packs         Pack[]
+  playerCards   PlayerCard[]
+  predictions   Prediction[]
+  roomPlayers   RoomPlayer[]
+  torneosOwned  Torneo[]       @relation("TorneoOwner")
+  torneoMembers TorneoMember[]
 }
 
 model News {
@@ -36,28 +32,64 @@ model News {
   description String
   image       String?
   category    String   @default("Novedad")
+  displayMode String   @default("card")
+  isPublished Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  priority    Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
-// Pronóstico de un usuario sobre el resultado de un partido (sección Prode).
+
 model Prediction {
   id        Int      @id @default(autoincrement())
   userId    Int
   matchId   Int
-  scoreA    Int // goles pronosticados para teamA
-  scoreB    Int // goles pronosticados para teamB
-  status    String   @default("pending") // pending, won, lost
+  torneoId  Int?
+  scoreA    Int
+  scoreB    Int
+  status    String   @default("pending")
   pointsWon Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  match     Match    @relation(fields: [matchId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  torneo    Torneo?  @relation(fields: [torneoId], references: [id], onDelete: Cascade)
 
-  user  User  @relation(fields: [userId], references: [id])
-  match Match @relation(fields: [matchId], references: [id])
-
-  @@unique([userId, matchId])
+  @@unique([userId, matchId, torneoId])
   @@index([userId])
   @@index([matchId])
+  @@index([torneoId])
+}
+
+model Torneo {
+  id          Int            @id @default(autoincrement())
+  nombre      String
+  descripcion String         @default("")
+  codigo      String         @unique
+  ownerId     Int? // null = torneo oficial de la casa
+  isPublic    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  owner       User?          @relation("TorneoOwner", fields: [ownerId], references: [id])
+  members     TorneoMember[]
+  predictions Prediction[]
+
+  @@index([ownerId])
+}
+
+model TorneoMember {
+  id       Int      @id @default(autoincrement())
+  torneoId Int
+  userId   Int
+  puntos   Int      @default(0)
+  aciertos Int      @default(0) // resultados exactos acertados
+  joinedAt DateTime @default(now())
+  torneo   Torneo   @relation(fields: [torneoId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([torneoId, userId])
+  @@index([userId])
 }
 
 model Player {
@@ -83,23 +115,18 @@ model Player {
 }
 
 model PlayerCard {
-  id       Int    @id @default(autoincrement())
-  playerId Int
-  userId   Int
-  rarity   String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id          Int          @id @default(autoincrement())
+  playerId    Int
+  userId      Int
+  rarity      String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  isLocked    Boolean      @default(false)
+  mazoId      Int?
+  mazo        Mazo?        @relation("MazoCards", fields: [mazoId], references: [id])
   player      Player       @relation(fields: [playerId], references: [id])
   user        User         @relation(fields: [userId], references: [id])
-  isLocked    Boolean      @default(false)
   roomPlayers RoomPlayer[]
-
-  // playerCard representa una carta/jugador 
-  // puede pertenecer a un mazo (opcionalmente)
-  mazo   Mazo? @relation("MazoCards", fields: [mazoId], references: [id])
-  mazoId Int?
 
   @@index([playerId])
   @@index([userId])
@@ -118,14 +145,11 @@ model Pack {
 }
 
 model Mazo {
-  id     Int    @id @default(autoincrement())
+  id     Int          @id @default(autoincrement())
   nombre String
   userId Int
-
-  user User @relation(fields: [userId], references: [id])
-
-  // mazo tiene muchas cartas/jugadores.
-  cards PlayerCard[] @relation("MazoCards")
+  user   User         @relation(fields: [userId], references: [id])
+  cards  PlayerCard[] @relation("MazoCards")
 
   @@index([userId])
 }
@@ -146,13 +170,13 @@ model RoomPlayer {
   id         Int         @id @default(autoincrement())
   roomId     Int
   userId     Int
-  team       Int // 0 o 1
-  pickCardId Int? // carta seleccionada
+  team       Int
+  pickCardId Int?
   ready      Boolean     @default(false)
   joinedAt   DateTime    @default(now())
-  user       User        @relation(fields: [userId], references: [id])
-  room       Room        @relation(fields: [roomId], references: [id])
   pick       PlayerCard? @relation(fields: [pickCardId], references: [id])
+  room       Room        @relation(fields: [roomId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
 
   @@index([pickCardId])
 }
@@ -160,14 +184,14 @@ model RoomPlayer {
 model Match {
   id           Int           @id @default(autoincrement())
   roomId       String?
-  externalId   String?       @unique // id del partido en la API de fútbol (sportdb)
   teamA        String
   teamB        String
-  scheduledAt  DateTime // Fecha programada del partido
-  startedAt    DateTime? // Ahora es opcional (null hasta que inicie)
+  scheduledAt  DateTime
+  startedAt    DateTime?
   finishedAt   DateTime?
   result       String?
-  status       String        @default("scheduled") // scheduled, live, finished, cancelled
+  status       String        @default("scheduled")
+  externalId   String?       @unique
   matchResults MatchResult[]
   predictions  Prediction[]
 }
@@ -182,9 +206,8 @@ model MatchResult {
   saves     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  match Match @relation(fields: [matchId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
+  match     Match    @relation(fields: [matchId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([matchId])
   @@index([userId])

@@ -42,7 +42,12 @@ export class RoomGateway implements OnModuleInit, OnGatewayConnection, OnGateway
 
   async handleDisconnect(client: Socket) {
     console.log(`Cliente desconectado: ${client.id}`);
-    this.roomService.onPlayerDisconnected(client.id);
+    const room = this.roomService.onPlayerDisconnected(client.id);
+    // Avisar al jugador que quedó en la sala que su rival se fue.
+    if (room && room.status !== 'finished') {
+      this.server.to(room.id).emit('playerLeft', room);
+      this.server.to(room.id).emit('roomUpdated', room);
+    }
   }
 
   @SubscribeMessage('createPrivateRoom')

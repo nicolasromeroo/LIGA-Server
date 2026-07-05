@@ -19,7 +19,8 @@ import { PlayerService } from './player.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-// import { Roles } from 'src/auth/decorators/roles.decorator';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
 
 @Controller('player')
 export class PlayerController {
@@ -53,22 +54,22 @@ export class PlayerController {
     return { path: `/players/${file.filename}` };
   }
 
-  @UseGuards(JwtAuthGuard)
-  // @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @Post('add-to-game')
   create(@Body() createPlayerDto: CreatePlayerDto) {
     return this.playerService.addToGame(createPlayerDto);
   }
 
-  @UseGuards(JwtAuthGuard)
-  // @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @Patch('update/:id')
   update(@Param('id') id: string, @Body() updatePlayerDto: UpdatePlayerDto) {
     return this.playerService.updatePlayer(+id, updatePlayerDto);
   }
 
-  @UseGuards(JwtAuthGuard)
-  // @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
     return this.playerService.removePlayer(+id);

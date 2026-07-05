@@ -7,6 +7,28 @@ import { PrismaService } from '../prisma/prisma.service';
 
 export type Rarity = 'COMUN' | 'RARA' | 'EPICA' | 'LEGENDARIA';
 
+const RARITY_ORDER: Rarity[] = ['COMUN', 'RARA', 'EPICA', 'LEGENDARIA'];
+
+// El admin guarda la rareza del jugador en inglés ("epic") y las cartas se
+// guardaban en español ("EPICA"): normalizamos cualquier variante al bucket
+// en español que usan los pesos de los sobres.
+const RARITY_BUCKET: Record<string, Rarity> = {
+  comun: 'COMUN',
+  common: 'COMUN',
+  rara: 'RARA',
+  raro: 'RARA',
+  rare: 'RARA',
+  epica: 'EPICA',
+  epico: 'EPICA',
+  epic: 'EPICA',
+  legendaria: 'LEGENDARIA',
+  legendario: 'LEGENDARIA',
+  legendary: 'LEGENDARIA',
+};
+
+export const normalizeRarity = (r: string | null | undefined): Rarity =>
+  RARITY_BUCKET[String(r ?? '').toLowerCase().trim()] ?? 'COMUN';
+
 // Configuración de cada tipo de sobre: costo en puntos y pesos de rareza.
 type PackTier = {
   cost: number;
@@ -25,13 +47,6 @@ const PACK_TIERS: Record<string, PackTier> = {
 export class PacksService {
   constructor(private prisma: PrismaService) {}
 
-  private determinarRareza(): Rarity {
-    const random = Math.random();
-    if (random < 0.6) return 'COMUN';
-    if (random < 0.85) return 'RARA';
-    return 'EPICA';
-  }
-
   private rollRarity(weights: PackTier['weights']): Rarity {
     const total = Object.values(weights).reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
@@ -40,6 +55,45 @@ export class PacksService {
       if (r <= 0) return rarity as Rarity;
     }
     return 'COMUN';
+  }
+
+  // Agrupa el catálogo por rareza normalizada.
+  private groupByRarity<T extends { rarity: string }>(
+    jugadores: T[],
+  ): Map<Rarity, T[]> {
+    const map = new Map<Rarity, T[]>();
+    for (const jugador of jugadores) {
+      const bucket = normalizeRarity(jugador.rarity);
+      const pool = map.get(bucket);
+      if (pool) pool.push(jugador);
+      else map.set(bucket, [jugador]);
+    }
+    return map;
+  }
+
+  // Sortea una rareza con los pesos del sobre y elige un jugador de ESA
+  // rareza: la rareza de la carta siempre es la del jugador del catálogo.
+  // Si no hay jugadores de la rareza sorteada, cae al tier más cercano
+  // (primero hacia abajo, después hacia arriba).
+  private pickCard(
+    byRarity: Map<Rarity, { id: number }[]>,
+    weights: PackTier['weights'],
+  ): { playerId: number; rarity: Rarity } | null {
+    const rolled = this.rollRarity(weights);
+    const idx = RARITY_ORDER.indexOf(rolled);
+    const fallback: Rarity[] = [
+      rolled,
+      ...RARITY_ORDER.slice(0, idx).reverse(),
+      ...RARITY_ORDER.slice(idx + 1),
+    ];
+    for (const rarity of fallback) {
+      const pool = byRarity.get(rarity);
+      if (pool?.length) {
+        const jugador = pool[Math.floor(Math.random() * pool.length)];
+        return { playerId: jugador.id, rarity };
+      }
+    }
+    return null;
   }
 
   // Compra y abre un sobre: descuenta puntos y entrega cartas con datos del jugador.
@@ -62,10 +116,10 @@ export class PacksService {
       throw new BadRequestException('No hay jugadores disponibles todavía');
     }
 
-    const seleccion = Array.from({ length: tier.cards }, () => {
-      const jugador = jugadores[Math.floor(Math.random() * jugadores.length)];
-      return { playerId: jugador.id, rarity: this.rollRarity(tier.weights) };
-    });
+    const byRarity = this.groupByRarity(jugadores);
+    const seleccion = Array.from({ length: tier.cards }, () =>
+      this.pickCard(byRarity, tier.weights),
+    ).filter((c): c is { playerId: number; rarity: Rarity } => c !== null);
 
     const result = await this.prisma.$transaction(async (tx) => {
       if (tier.cost > 0) {
@@ -109,17 +163,17 @@ export class PacksService {
       throw new Error('No hay jugadores disponibles');
     }
 
-    // Generar 3 cartas aleatorias
+    // Generar 3 cartas aleatorias (misma lógica que buyAndOpen: la rareza
+    // de la carta es siempre la rareza del jugador del catálogo).
+    const byRarity = this.groupByRarity(jugadores);
+    const weights = { COMUN: 60, RARA: 25, EPICA: 15, LEGENDARIA: 0 };
     const cartasGeneradas: Array<{ playerId: number; rarity: Rarity }> = [];
     for (let i = 0; i < 3; i++) {
-      const jugador = jugadores[Math.floor(Math.random() * jugadores.length)];
-      if (!jugador || !jugador.id) {
+      const carta = this.pickCard(byRarity, weights);
+      if (!carta) {
         throw new Error('Jugador inválido encontrado');
       }
-      cartasGeneradas.push({
-        playerId: jugador.id,
-        rarity: this.determinarRareza(),
-      });
+      cartasGeneradas.push(carta);
     }
 
     // Crear las cartas en la base de datos usando una transacción

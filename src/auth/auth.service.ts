@@ -29,8 +29,10 @@ export class AuthService {
         email: createAuthDto.email,
         password: hashedPassword,
         name: createAuthDto.name,
-        role: createAuthDto.role || 'USER',
-        points: createAuthDto.role === 'ADMIN' ? 999999 : 1000 // More points for admin
+        // El rol NUNCA viene del cliente: todo registro es USER.
+        // Los admin se asignan manualmente en la base de datos.
+        role: 'USER',
+        points: 1000
       }
     });
 

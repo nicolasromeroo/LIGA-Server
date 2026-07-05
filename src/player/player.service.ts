@@ -34,6 +34,24 @@ export class PlayerService {
   }
 
   async removePlayer(id: number) {
+    const cards = await this.prismaService.playerCard.findMany({
+      where: { playerId: id },
+      select: { id: true },
+    });
+
+    if (cards.length > 0) {
+      await this.prismaService.roomPlayer.deleteMany({
+        where: {
+          pickCardId: {
+            in: cards.map((card) => card.id),
+          },
+        },
+      });
+      await this.prismaService.playerCard.deleteMany({
+        where: { playerId: id },
+      });
+    }
+
     return await this.prismaService.player.delete({
       where: {
         id,

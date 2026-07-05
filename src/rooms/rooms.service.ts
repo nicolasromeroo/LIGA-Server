@@ -69,6 +69,11 @@ export class RoomService {
     if (!room || selectedPlayers.length !== 5) {
       return null;
     }
+    // Solo se aceptan selecciones durante la fase de alineación: evita que
+    // una confirmación tardía re-dispare la batalla (y duplique puntos).
+    if (room.status !== 'selecting') {
+      return null;
+    }
 
     room.playersSelected[socketId] = selectedPlayers;
 
@@ -94,6 +99,8 @@ export class RoomService {
   async resolveBattle(roomId: string): Promise<BattleResult | null> {
     const room = this.rooms[roomId];
     if (!room) return null;
+    // Idempotencia: si la batalla ya se resolvió, no se vuelve a premiar.
+    if (room.result) return null;
 
     const [a, b] = room.players;
     const powerA = await this.teamPower(room.playersSelected[a?.socketId] ?? []);
@@ -155,20 +162,33 @@ export class RoomService {
     return room;
   }
 
-  onPlayerDisconnected(socketId: string) {
+  // Devuelve la sala afectada (si sigue viva) para que el gateway pueda
+  // avisar al jugador que quedó solo.
+  onPlayerDisconnected(socketId: string): Room | null {
     const roomId = this.playerRooms[socketId];
-    if (roomId) {
-      const room = this.rooms[roomId];
-      if (room) {
-        room.players = room.players.filter((p) => p.socketId !== socketId);
-        room.playersUsernames = room.players.map((p) => p.username);
-        delete room.playersSelected[socketId];
-        if (room.players.length === 0) {
-          delete this.rooms[roomId];
-        }
-      }
-      delete this.playerRooms[socketId];
+    if (!roomId) return null;
+    delete this.playerRooms[socketId];
+
+    const room = this.rooms[roomId];
+    if (!room) return null;
+
+    const wasInRoom = room.players.some((p) => p.socketId === socketId);
+    room.players = room.players.filter((p) => p.socketId !== socketId);
+    room.playersUsernames = room.players.map((p) => p.username);
+    delete room.playersSelected[socketId];
+
+    if (room.players.length === 0) {
+      delete this.rooms[roomId];
+      return null;
     }
+
+    // Si se fue un jugador en plena alineación, la sala vuelve a esperar
+    // rival (el código sigue siendo válido para que entre otro).
+    if (room.status === 'selecting') {
+      room.status = 'waiting';
+    }
+
+    return wasInRoom ? room : null;
   }
 
   getRoomByCode(roomCode: string): Room | null {
